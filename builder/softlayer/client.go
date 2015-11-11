@@ -9,6 +9,7 @@ import (
 	"log"
 	"net/http"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -30,18 +31,20 @@ type SoftLayerRequest struct {
 
 // Based on: http://sldn.softlayer.com/reference/datatypes/SoftLayer_Container_Virtual_Guest_Configuration/
 type InstanceType struct {
-	HostName             string `json:"hostname"`
-	Domain               string
-	Datacenter           string
-	Cpus                 int
-	Memory               int64
-	HourlyBillingFlag    bool
-	LocalDiskFlag        bool
-	DiskCapacity         int
-	NetworkSpeed         int
-	ProvisioningSshKeyId int64
-	BaseImageId          string
-	BaseOsCode           string
+	HostName               string `json:"hostname"`
+	Domain                 string
+	Datacenter             string
+	Cpus                   int
+	Memory                 int64
+	HourlyBillingFlag      bool
+	LocalDiskFlag          bool
+	DiskCapacity           int
+	DiskCapacities         string
+	NetworkSpeed           int
+        PrivateNetworkOnlyFlag bool
+	ProvisioningSshKeyId   int64
+	BaseImageId            string
+	BaseOsCode             string
 }
 
 type InstanceReq struct {
@@ -52,6 +55,7 @@ type InstanceReq struct {
 	Memory                   int64                     `json:"maxMemory"`
 	HourlyBillingFlag        bool                      `json:"hourlyBillingFlag"`
 	LocalDiskFlag            bool                      `json:"localDiskFlag"`
+    PrivateNetworkOnlyFlag   bool                      `json:"privateNetworkOnlyFlag"`
 	NetworkComponents        []*NetworkComponent       `json:"networkComponents"`
 	BlockDeviceTemplateGroup *BlockDeviceTemplateGroup `json:"blockDeviceTemplateGroup,omitempty"`
 	BlockDevices             []*BlockDevice            `json:"blockDevices,omitempty"`
@@ -195,7 +199,7 @@ func (self SoftlayerClient) doHttpRequest(path string, requestType string, reque
 		return []interface{} {v,}, nil
 
 	case nil:
-		return []interface{} {nil,}, nil	
+		return []interface{} {nil,}, nil
 	default:
 		return nil, errors.New("Unexpected type in HTTP response")
 	}
@@ -221,13 +225,16 @@ func (self SoftlayerClient) CreateInstance(instance InstanceType) (map[string]in
 		Cpus:              instance.Cpus,
 		Memory:            instance.Memory,
 		HourlyBillingFlag: true,
-		LocalDiskFlag:     false,
+		LocalDiskFlag:     true,
+		PrivateNetworkOnlyFlag: true,
 		NetworkComponents: []*NetworkComponent{
 			&NetworkComponent{
 				MaxSpeed: instance.NetworkSpeed,
 			},
 		},
 	}
+
+	log.Printf("instanceRequest struct is: %+v", instanceRequest)
 
 	if instance.ProvisioningSshKeyId != 0 {
 		instanceRequest.SshKeys = []*SshKey{
@@ -241,7 +248,7 @@ func (self SoftlayerClient) CreateInstance(instance InstanceType) (map[string]in
 		instanceRequest.BlockDeviceTemplateGroup = &BlockDeviceTemplateGroup{
 			Id: instance.BaseImageId,
 		}
-	} else {
+	} else if instance.DiskCapacities == "" {
 		instanceRequest.OsReferenceCode = instance.BaseOsCode
 		instanceRequest.BlockDevices = []*BlockDevice{
 			&BlockDevice{
@@ -251,9 +258,31 @@ func (self SoftlayerClient) CreateInstance(instance InstanceType) (map[string]in
 				},
 			},
 		}
+	} else {
+		instanceRequest.OsReferenceCode = instance.BaseOsCode
+		// takes the form of <dev_number>:<size> seperated by commas. Ex:
+		// 0:25,2:25,3:100
+		// dev 0 25gb (xvda), dev 2 25gb(xvdc), dev3 100gb (xvde).
+		// sl doesn't let you use dev 1, and device 3 shifts so as to bypass xvdd
+		instanceRequest.BlockDevices = []*BlockDevice{}
+		for _, dev := range strings.Split(instance.DiskCapacities, ",") {
+			//devnum, devsizestr := strings.Split(dev, ":")
+			words := strings.Split(dev, ":")
+			devnum := words[0]
+			devsizestr := words[1]
+			devsize, _ := strconv.Atoi(devsizestr)
+			bd := &BlockDevice{
+				Device: devnum,
+				DiskImage: &DiskImage{
+					Capacity: devsize,
+				},
+			}
+			instanceRequest.BlockDevices = append(instanceRequest.BlockDevices, bd)
+		}
 	}
 
 	requestBody, err := self.generateRequestBody(instanceRequest)
+	log.Printf("create instance request body is: %s", requestBody)
 	if err != nil {
 		return nil, err
 	}
@@ -309,7 +338,7 @@ func (self SoftlayerClient) DestroySshKey(keyId int64) error {
 }
 
 func (self SoftlayerClient) getInstancePublicIp(instanceId string) (string, error) {
-	response, err := self.doRawHttpRequest(fmt.Sprintf("SoftLayer_Virtual_Guest/%s/getPrimaryIpAddress.json", instanceId), "GET", nil)
+	response, err := self.doRawHttpRequest(fmt.Sprintf("SoftLayer_Virtual_Guest/%s/getPrimaryBackendIpAddress.json", instanceId), "GET", nil)
 	if err != nil {
 		return "", nil
 	}
