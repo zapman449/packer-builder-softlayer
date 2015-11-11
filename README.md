@@ -98,6 +98,7 @@ The reference of available configuration options is listed below.
  * `instance_memory` (string) - The amount of Memory (in bytes) assigned to the instance. Defaults to 1024
  * `instance_network_speed` (string) - The network uplink speed, in megabits per second, which will be assigned to the instance. Defaults to 10
  * `instance_disk_capacity` (string) - The amount of Disk capacity (in gigabytes) assigned to the instance. Defaults to 25
+ * `instance_disk_capacities` (string) - Specify the sizes of multiple disks on the instance.  Format is "0:25,2:100" => disk0 (xvda) will be 25g and disk2 (xvdc) will be 100g.  (Softlayer reserves disk1 for swap).  NOTE: This version forces local storage only, and limits you to only two disks.  Future work will allow setting the boolean for local vs san storage (at which point the limit will be 5, and 0=>xvda, 2=>xvdc 3=>xvde (skips xvdd for some reason) 4=> xvdf 5=> xvdg
  * `ssh_port` (string) - The port that SSH will be available on. Defaults to port 22
  * `ssh_timeout` (string) - The time to wait for SSH to become available before timing out. The format of this value is a duration such as "5s" or "5m". The default SSH timeout is "1m". Defaults to "15m"
  * `ssh_private_key_file` (string) - Use this ssh private key file instead of a generated ssh key pair for connecting to the instance.
