@@ -41,26 +41,30 @@ type InstanceType struct {
 	DiskCapacity           int
 	DiskCapacities         string
 	NetworkSpeed           int
-        PrivateNetworkOnlyFlag bool
+	PublicVlan:            int
+	PrivateVlan:           int
+	PrivateNetworkOnlyFlag bool
 	ProvisioningSshKeyId   int64
 	BaseImageId            string
 	BaseOsCode             string
 }
 
 type InstanceReq struct {
-	HostName                 string                    `json:"hostname"`
-	Domain                   string                    `json:"domain"`
-	Datacenter               *Datacenter               `json:"datacenter"`
-	Cpus                     int                       `json:"startCpus"`
-	Memory                   int64                     `json:"maxMemory"`
-	HourlyBillingFlag        bool                      `json:"hourlyBillingFlag"`
-	LocalDiskFlag            bool                      `json:"localDiskFlag"`
-    PrivateNetworkOnlyFlag   bool                      `json:"privateNetworkOnlyFlag"`
-	NetworkComponents        []*NetworkComponent       `json:"networkComponents"`
-	BlockDeviceTemplateGroup *BlockDeviceTemplateGroup `json:"blockDeviceTemplateGroup,omitempty"`
-	BlockDevices             []*BlockDevice            `json:"blockDevices,omitempty"`
-	OsReferenceCode          string                    `json:"operatingSystemReferenceCode,omitempty"`
-	SshKeys                  []*SshKey                 `json:"sshKeys,omitempty"`
+	HostName                        string                           `json:"hostname"`
+	Domain                          string                           `json:"domain"`
+	Datacenter                      *Datacenter                      `json:"datacenter"`
+	Cpus                            int                              `json:"startCpus"`
+	Memory                          int64                            `json:"maxMemory"`
+	HourlyBillingFlag               bool                             `json:"hourlyBillingFlag"`
+	LocalDiskFlag                   bool                             `json:"localDiskFlag"`
+    PrivateNetworkOnlyFlag          bool                             `json:"privateNetworkOnlyFlag"`
+	NetworkComponents               []*NetworkComponent              `json:"networkComponents"`
+	BlockDeviceTemplateGroup        *BlockDeviceTemplateGroup        `json:"blockDeviceTemplateGroup,omitempty"`
+	BlockDevices                    []*BlockDevice                   `json:"blockDevices,omitempty"`
+	OsReferenceCode                 string                           `json:"operatingSystemReferenceCode,omitempty"`
+	SshKeys                         []*SshKey                        `json:"sshKeys,omitempty"`
+	PrimaryNetworkComponent         *PrimaryNetworkComponent         `json:"primaryNetworkComponent,omitempty"`
+	PrimaryBackendNetworkComponent  *PrimaryBackendNetworkComponent  `json:"primaryBackendNetworkComponent,omitempty"`
 }
 
 type InstanceImage struct {
@@ -83,6 +87,20 @@ type BlockDeviceTemplateGroup struct {
 
 type DiskImage struct {
 	Capacity int `json:"capacity"`
+}
+
+	//BlockDeviceTemplateGroup *BlockDeviceTemplateGroup `json:"blockDeviceTemplateGroup,omitempty"`
+
+type PrimaryNetworkComponent struct {
+	NetworkVlan *NetworkVlan `json:"networkVlan,omitempty"`
+}
+
+type PrimaryBackendNetworkComponent struct {
+	NetworkVlan *NetworkVlan `json:"networkVlan,omitempty"`
+}
+
+type NetworkVlan struct {
+	id int `json:"networkVlan"`
 }
 
 type SshKey struct {
@@ -226,15 +244,13 @@ func (self SoftlayerClient) CreateInstance(instance InstanceType) (map[string]in
 		Memory:            instance.Memory,
 		HourlyBillingFlag: true,
 		LocalDiskFlag:     true,
-		PrivateNetworkOnlyFlag: true,
+		PrivateNetworkOnlyFlag: instance.PrivateNetworkOnlyFlag,
 		NetworkComponents: []*NetworkComponent{
 			&NetworkComponent{
 				MaxSpeed: instance.NetworkSpeed,
 			},
 		},
 	}
-
-	log.Printf("instanceRequest struct is: %+v", instanceRequest)
 
 	if instance.ProvisioningSshKeyId != 0 {
 		instanceRequest.SshKeys = []*SshKey{
@@ -280,6 +296,28 @@ func (self SoftlayerClient) CreateInstance(instance InstanceType) (map[string]in
 			instanceRequest.BlockDevices = append(instanceRequest.BlockDevices, bd)
 		}
 	}
+
+	if instance.PublicVlan != 0 {
+		instanceRequest.[]*PrimaryNetworkComponent{
+			&PrimaryNetworkComponent{
+				NetworkVlan: &NetworkVlan{
+					id: instance.PublicVlan
+				}
+			}
+		}
+	}
+
+	if instance.PrivateVlan != 0 {
+		instanceRequest.[]*PrimaryBackendNetworkComponent{
+			&PrimaryBackendNetworkComponent{
+				NetworkVlan: &NetworkVlan{
+					id: instance.PrivateVlan
+				}
+			}
+		}
+	}
+
+	log.Printf("instanceRequest struct is: %+v", instanceRequest)
 
 	requestBody, err := self.generateRequestBody(instanceRequest)
 	log.Printf("create instance request body is: %s", requestBody)

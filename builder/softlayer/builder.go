@@ -30,13 +30,16 @@ type Config struct {
 	BaseImageId      string `mapstructure:"base_image_id"`
 	BaseOsCode       string `mapstructure:"base_os_code"`
 
-	InstanceName           string `mapstructure:"instance_name"`
-	InstanceDomain         string `mapstructure:"instance_domain"`
-	InstanceCpu            int    `mapstructure:"instance_cpu"`
-	InstanceMemory         int64  `mapstructure:"instance_memory"`
-	InstanceNetworkSpeed   int    `mapstructure:"instance_network_speed"`
-	InstanceDiskCapacity   int    `mapstructure:"instance_disk_capacity"`
-	InstanceDiskCapacities string `mapstructure:"instance_disk_capacities"`
+	InstanceName               string `mapstructure:"instance_name"`
+	InstanceDomain             string `mapstructure:"instance_domain"`
+	InstanceCpu                int    `mapstructure:"instance_cpu"`
+	InstanceMemory             int64  `mapstructure:"instance_memory"`
+	InstanceNetworkSpeed       int    `mapstructure:"instance_network_speed"`
+	InstancePrivateVlan        int    `mapstructure:"instance_private_vlan"`
+	InstancePublicVlan         int    `mapstructure:"instance_public_vlan"`
+	InstancePrivateNetworkOnly bool   `mapstructure:"instance_private_network_only"`
+	InstanceDiskCapacity       int    `mapstructure:"instance_disk_capacity"`
+	InstanceDiskCapacities     string `mapstructure:"instance_disk_capacities"`
 
 	RawStateTimeout string `mapstructure:"instance_state_timeout"`
 	StateTimeout    time.Duration
@@ -78,6 +81,10 @@ func (self *Builder) Prepare(raws ...interface{}) (parms []string, retErr error)
 
 	if self.config.DatacenterName == "" {
 		self.config.DatacenterName = "ams01"
+	}
+
+	if self.config.InstancePublicVlan == 0 {
+		self.config.InstancePrivateNetworkOnly = true
 	}
 
 	if self.config.InstanceName == "" {
