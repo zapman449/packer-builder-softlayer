@@ -41,8 +41,8 @@ type InstanceType struct {
 	DiskCapacity           int
 	DiskCapacities         string
 	NetworkSpeed           int
-	PublicVlan:            int
-	PrivateVlan:           int
+	PublicVlan             int
+	PrivateVlan            int
 	PrivateNetworkOnlyFlag bool
 	ProvisioningSshKeyId   int64
 	BaseImageId            string
@@ -298,20 +298,20 @@ func (self SoftlayerClient) CreateInstance(instance InstanceType) (map[string]in
 	}
 
 	if instance.PublicVlan != 0 {
-		instanceRequest.[]*PrimaryNetworkComponent{
+		instanceRequest.PrimaryNetworkComponent = []*PrimaryNetworkComponent{
 			&PrimaryNetworkComponent{
 				NetworkVlan: &NetworkVlan{
-					id: instance.PublicVlan
+					id: instance.PublicVlan,
 				}
 			}
 		}
 	}
 
 	if instance.PrivateVlan != 0 {
-		instanceRequest.[]*PrimaryBackendNetworkComponent{
+		instanceRequest.PrimaryBackendNetworkComponent = []*PrimaryBackendNetworkComponent{
 			&PrimaryBackendNetworkComponent{
 				NetworkVlan: &NetworkVlan{
-					id: instance.PrivateVlan
+					id: instance.PrivateVlan,
 				}
 			}
 		}
