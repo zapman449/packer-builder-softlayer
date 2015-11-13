@@ -24,22 +24,18 @@ func (self *stepCreateInstance) Run(state multistep.StateBag) multistep.StepActi
 	}
 
 	instanceDefinition := &InstanceType{
-		HostName:               config.InstanceName,
-		Domain:                 config.InstanceDomain,
-		Datacenter:             config.DatacenterName,
-		Cpus:                   config.InstanceCpu,
-		Memory:                 config.InstanceMemory,
-		HourlyBillingFlag:      true,
-		LocalDiskFlag:          true,
-		DiskCapacity:           config.InstanceDiskCapacity,
-		DiskCapacities:         config.InstanceDiskCapacities,
-		NetworkSpeed:           config.InstanceNetworkSpeed,
-		PublicVlan:             config.InstancePublicVlan,
-		PrivateVlan:            config.InstancePrivateVlan,
-		PrivateNetworkOnlyFlag: config.InstancePrivateNetworkOnly,
-		ProvisioningSshKeyId:   ProvisioningSshKeyId,
-		BaseImageId:            config.BaseImageId,
-		BaseOsCode:             config.BaseOsCode,
+		HostName:             config.InstanceName,
+		Domain:               config.InstanceDomain,
+		Datacenter:           config.DatacenterName,
+		Cpus:                 config.InstanceCpu,
+		Memory:               config.InstanceMemory,
+		HourlyBillingFlag:    true,
+		LocalDiskFlag:        true,
+		DiskCapacity:         config.InstanceDiskCapacity,
+		NetworkSpeed:         config.InstanceNetworkSpeed,
+		ProvisioningSshKeyId: ProvisioningSshKeyId,
+		BaseImageId:          config.BaseImageId,
+		BaseOsCode:           config.BaseOsCode,
 	}
 
 	ui.Say("Creating an instance...")
@@ -53,6 +49,16 @@ func (self *stepCreateInstance) Run(state multistep.StateBag) multistep.StepActi
 	state.Put("instance_data", instanceData)
 	self.instanceId = instanceData["globalIdentifier"].(string)
 	ui.Say(fmt.Sprintf("Created instance, id: '%s'", instanceData["globalIdentifier"].(string)))
+
+	// Tag instance if required
+	if config.Tags != "" {
+		err := client.TagInstance(self.instanceId, config.Tags)
+		if err != nil {
+			ui.Error(err.Error())
+			state.Put("error", err)
+			return multistep.ActionHalt
+		}
+	}
 
 	return multistep.ActionContinue
 }

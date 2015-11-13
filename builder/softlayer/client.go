@@ -9,7 +9,6 @@ import (
 	"log"
 	"net/http"
 	"regexp"
-	"strconv"
 	"strings"
 	"time"
 )
@@ -31,40 +30,33 @@ type SoftLayerRequest struct {
 
 // Based on: http://sldn.softlayer.com/reference/datatypes/SoftLayer_Container_Virtual_Guest_Configuration/
 type InstanceType struct {
-	HostName               string `json:"hostname"`
-	Domain                 string
-	Datacenter             string
-	Cpus                   int
-	Memory                 int64
-	HourlyBillingFlag      bool
-	LocalDiskFlag          bool
-	DiskCapacity           int
-	DiskCapacities         string
-	NetworkSpeed           int
-	PublicVlan             int
-	PrivateVlan            int
-	PrivateNetworkOnlyFlag bool
-	ProvisioningSshKeyId   int64
-	BaseImageId            string
-	BaseOsCode             string
+	HostName             string `json:"hostname"`
+	Domain               string
+	Datacenter           string
+	Cpus                 int
+	Memory               int64
+	HourlyBillingFlag    bool
+	LocalDiskFlag        bool
+	DiskCapacity         int
+	NetworkSpeed         int
+	ProvisioningSshKeyId int64
+	BaseImageId          string
+	BaseOsCode           string
 }
 
 type InstanceReq struct {
-	HostName                        string                           `json:"hostname"`
-	Domain                          string                           `json:"domain"`
-	Datacenter                      *Datacenter                      `json:"datacenter"`
-	Cpus                            int                              `json:"startCpus"`
-	Memory                          int64                            `json:"maxMemory"`
-	HourlyBillingFlag               bool                             `json:"hourlyBillingFlag"`
-	LocalDiskFlag                   bool                             `json:"localDiskFlag"`
-    PrivateNetworkOnlyFlag          bool                             `json:"privateNetworkOnlyFlag"`
-	NetworkComponents               []*NetworkComponent              `json:"networkComponents"`
-	BlockDeviceTemplateGroup        *BlockDeviceTemplateGroup        `json:"blockDeviceTemplateGroup,omitempty"`
-	BlockDevices                    []*BlockDevice                   `json:"blockDevices,omitempty"`
-	OsReferenceCode                 string                           `json:"operatingSystemReferenceCode,omitempty"`
-	SshKeys                         []*SshKey                        `json:"sshKeys,omitempty"`
-	PrimaryNetworkComponent         *PrimaryNetworkComponent         `json:"primaryNetworkComponent,omitempty"`
-	PrimaryBackendNetworkComponent  *PrimaryBackendNetworkComponent  `json:"primaryBackendNetworkComponent,omitempty"`
+	HostName                 string                    `json:"hostname"`
+	Domain                   string                    `json:"domain"`
+	Datacenter               *Datacenter               `json:"datacenter"`
+	Cpus                     int                       `json:"startCpus"`
+	Memory                   int64                     `json:"maxMemory"`
+	HourlyBillingFlag        bool                      `json:"hourlyBillingFlag"`
+	LocalDiskFlag            bool                      `json:"localDiskFlag"`
+	NetworkComponents        []*NetworkComponent       `json:"networkComponents"`
+	BlockDeviceTemplateGroup *BlockDeviceTemplateGroup `json:"blockDeviceTemplateGroup,omitempty"`
+	BlockDevices             []*BlockDevice            `json:"blockDevices,omitempty"`
+	OsReferenceCode          string                    `json:"operatingSystemReferenceCode,omitempty"`
+	SshKeys                  []*SshKey                 `json:"sshKeys,omitempty"`
 }
 
 type InstanceImage struct {
@@ -87,20 +79,6 @@ type BlockDeviceTemplateGroup struct {
 
 type DiskImage struct {
 	Capacity int `json:"capacity"`
-}
-
-	//BlockDeviceTemplateGroup *BlockDeviceTemplateGroup `json:"blockDeviceTemplateGroup,omitempty"`
-
-type PrimaryNetworkComponent struct {
-	NetworkVlan *NetworkVlan `json:"networkVlan,omitempty"`
-}
-
-type PrimaryBackendNetworkComponent struct {
-	NetworkVlan *NetworkVlan `json:"networkVlan,omitempty"`
-}
-
-type NetworkVlan struct {
-	id int `json:"networkVlan"`
 }
 
 type SshKey struct {
@@ -214,10 +192,10 @@ func (self SoftlayerClient) doHttpRequest(path string, requestType string, reque
 			return nil, err
 		}
 
-		return []interface{} {v,}, nil
+		return []interface{}{v}, nil
 
 	case nil:
-		return []interface{} {nil,}, nil
+		return []interface{}{nil}, nil
 	default:
 		return nil, errors.New("Unexpected type in HTTP response")
 	}
@@ -243,8 +221,7 @@ func (self SoftlayerClient) CreateInstance(instance InstanceType) (map[string]in
 		Cpus:              instance.Cpus,
 		Memory:            instance.Memory,
 		HourlyBillingFlag: true,
-		LocalDiskFlag:     true,
-		PrivateNetworkOnlyFlag: instance.PrivateNetworkOnlyFlag,
+		LocalDiskFlag:     false,
 		NetworkComponents: []*NetworkComponent{
 			&NetworkComponent{
 				MaxSpeed: instance.NetworkSpeed,
@@ -264,7 +241,7 @@ func (self SoftlayerClient) CreateInstance(instance InstanceType) (map[string]in
 		instanceRequest.BlockDeviceTemplateGroup = &BlockDeviceTemplateGroup{
 			Id: instance.BaseImageId,
 		}
-	} else if instance.DiskCapacities == "" {
+	} else {
 		instanceRequest.OsReferenceCode = instance.BaseOsCode
 		instanceRequest.BlockDevices = []*BlockDevice{
 			&BlockDevice{
@@ -274,53 +251,9 @@ func (self SoftlayerClient) CreateInstance(instance InstanceType) (map[string]in
 				},
 			},
 		}
-	} else {
-		instanceRequest.OsReferenceCode = instance.BaseOsCode
-		// takes the form of <dev_number>:<size> seperated by commas. Ex:
-		// 0:25,2:25,3:100
-		// dev 0 25gb (xvda), dev 2 25gb(xvdc), dev3 100gb (xvde).
-		// sl doesn't let you use dev 1, and device 3 shifts so as to bypass xvdd
-		instanceRequest.BlockDevices = []*BlockDevice{}
-		for _, dev := range strings.Split(instance.DiskCapacities, ",") {
-			//devnum, devsizestr := strings.Split(dev, ":")
-			words := strings.Split(dev, ":")
-			devnum := words[0]
-			devsizestr := words[1]
-			devsize, _ := strconv.Atoi(devsizestr)
-			bd := &BlockDevice{
-				Device: devnum,
-				DiskImage: &DiskImage{
-					Capacity: devsize,
-				},
-			}
-			instanceRequest.BlockDevices = append(instanceRequest.BlockDevices, bd)
-		}
 	}
-
-	if instance.PublicVlan != 0 {
-		instanceRequest.PrimaryNetworkComponent = []*PrimaryNetworkComponent{
-			&PrimaryNetworkComponent{
-				NetworkVlan: &NetworkVlan{
-					id: instance.PublicVlan,
-				}
-			}
-		}
-	}
-
-	if instance.PrivateVlan != 0 {
-		instanceRequest.PrimaryBackendNetworkComponent = []*PrimaryBackendNetworkComponent{
-			&PrimaryBackendNetworkComponent{
-				NetworkVlan: &NetworkVlan{
-					id: instance.PrivateVlan,
-				}
-			}
-		}
-	}
-
-	log.Printf("instanceRequest struct is: %+v", instanceRequest)
 
 	requestBody, err := self.generateRequestBody(instanceRequest)
-	log.Printf("create instance request body is: %s", requestBody)
 	if err != nil {
 		return nil, err
 	}
@@ -376,7 +309,7 @@ func (self SoftlayerClient) DestroySshKey(keyId int64) error {
 }
 
 func (self SoftlayerClient) getInstancePublicIp(instanceId string) (string, error) {
-	response, err := self.doRawHttpRequest(fmt.Sprintf("SoftLayer_Virtual_Guest/%s/getPrimaryBackendIpAddress.json", instanceId), "GET", nil)
+	response, err := self.doRawHttpRequest(fmt.Sprintf("SoftLayer_Virtual_Guest/%s/getPrimaryIpAddress.json", instanceId), "GET", nil)
 	if err != nil {
 		return "", nil
 	}
@@ -396,7 +329,7 @@ func (self SoftlayerClient) getBlockDevices(instanceId string) ([]interface{}, e
 	return data, nil
 }
 
-func (self SoftlayerClient) findNonSwapBlockDeviceIds(blockDevices []interface{}) ([]int64) {
+func (self SoftlayerClient) findNonSwapBlockDeviceIds(blockDevices []interface{}) []int64 {
 	blockDeviceIds := make([]int64, len(blockDevices))
 	deviceCount := 0
 
@@ -445,9 +378,8 @@ func (self SoftlayerClient) findImageIdByName(imageName string) (string, error) 
 		return "", err
 	}
 
-	return imageId, nil;
+	return imageId, nil
 }
-
 
 func (self SoftlayerClient) captureStandardImage(instanceId string, imageName string, imageDescription string, blockDeviceIds []int64) (map[string]interface{}, error) {
 	blockDevices := make([]*BlockDevice, len(blockDeviceIds))
@@ -561,4 +493,22 @@ func (self SoftlayerClient) waitForInstanceReady(instanceId string, timeout time
 		err := fmt.Errorf("Timeout while waiting to for the instance to become ready")
 		return err
 	}
+}
+
+func (self SoftlayerClient) TagInstance(instanceId string, tags string) (err error) {
+	requestBody, err := self.generateRequestBody(tags)
+	if err != nil {
+		return err
+	}
+
+	response, err := self.doRawHttpRequest(fmt.Sprintf("SoftLayer_Virtual_Guest/%s/setTags.json", instanceId), "POST", requestBody)
+	if err != nil {
+		return err
+	}
+
+	if res := string(response[:]); res != "true" {
+		return errors.New(fmt.Sprintf("Failed to tag instance with id '%s', got '%s' as response from the API.", instanceId, res))
+	}
+
+	return nil
 }

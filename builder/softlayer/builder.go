@@ -30,19 +30,18 @@ type Config struct {
 	BaseImageId      string `mapstructure:"base_image_id"`
 	BaseOsCode       string `mapstructure:"base_os_code"`
 
-	InstanceName               string `mapstructure:"instance_name"`
-	InstanceDomain             string `mapstructure:"instance_domain"`
-	InstanceCpu                int    `mapstructure:"instance_cpu"`
-	InstanceMemory             int64  `mapstructure:"instance_memory"`
-	InstanceNetworkSpeed       int    `mapstructure:"instance_network_speed"`
-	InstancePrivateVlan        int    `mapstructure:"instance_private_vlan"`
-	InstancePublicVlan         int    `mapstructure:"instance_public_vlan"`
-	InstancePrivateNetworkOnly bool   `mapstructure:"instance_private_network_only"`
-	InstanceDiskCapacity       int    `mapstructure:"instance_disk_capacity"`
-	InstanceDiskCapacities     string `mapstructure:"instance_disk_capacities"`
+	InstanceName         string `mapstructure:"instance_name"`
+	InstanceDomain       string `mapstructure:"instance_domain"`
+	InstanceCpu          int    `mapstructure:"instance_cpu"`
+	InstanceMemory       int64  `mapstructure:"instance_memory"`
+	InstanceNetworkSpeed int    `mapstructure:"instance_network_speed"`
+	InstanceDiskCapacity int    `mapstructure:"instance_disk_capacity"`
 
 	RawStateTimeout string `mapstructure:"instance_state_timeout"`
 	StateTimeout    time.Duration
+
+	SSHKeyID int64  `mapstructure:"ssh_key_id"`
+	Tags     string `mapstructure:"tags"`
 
 	ctx interpolate.Context
 }
@@ -83,10 +82,6 @@ func (self *Builder) Prepare(raws ...interface{}) (parms []string, retErr error)
 		self.config.DatacenterName = "ams01"
 	}
 
-	if self.config.InstancePublicVlan == 0 {
-		self.config.InstancePrivateNetworkOnly = true
-	}
-
 	if self.config.InstanceName == "" {
 		self.config.InstanceName = fmt.Sprintf("packer-softlayer-%s", time.Now().Unix())
 	}
@@ -115,7 +110,7 @@ func (self *Builder) Prepare(raws ...interface{}) (parms []string, retErr error)
 		self.config.InstanceNetworkSpeed = 10
 	}
 
-	if self.config.InstanceDiskCapacity == 0 && self.config.InstanceDiskCapacities == "" {
+	if self.config.InstanceDiskCapacity == 0 {
 		self.config.InstanceDiskCapacity = 25
 	}
 
